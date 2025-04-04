@@ -1,0 +1,133 @@
+Requirements document: 8051 microcontroller-based real-time clock and alarm system
+1. Project Overview
+This system is designed based on 8051 series microcontroller (e.g. STC89C52), providing high-precision time data through DS1302 real-time clock chip, supporting time display, manual calibration, alarm setting and triggering functions. The system displays the time (year, month, day, week, hour, minute, second) in real time through LCD1602 display, and the alarm time and switch state can be set through the keypad, and the alarm configuration is saved to the internal EEPROM of the microcontroller, which ensures that it will not be lost in case of power failure. The buzzer module is used for the sound prompt when the alarm clock is triggered, which is suitable for home, office and other scenarios that require time management.
+
+2. Function Requirements
+Function No. Function Description Input/Trigger Condition Output/Response Result
+F1 Real-time time display The system runs automatically on power-up LCD displays the current time (format: YYYY-MM-DD HH:MM:SS )
+F2 Manual time calibration Press setting key (P3.2) to enter time setting mode, support year, month, day of the week, hour, minute and second adjustment.
+F3 Alarm setting and saving Press alarm key (P3.3) to set alarm time (hour, minute) and switch state, save to EEPROM.
+F4 Alarm Clock Trigger Match the current time with the alarm time Buzzer beeps at 0.2Hz and continues until manually switched off or timeout.
+F5 Key de-jittering process Hardware delay de-jittering when key is pressed to avoid false trigger.
+F6 Abnormal time recovery DS1302 not initialised Auto write default time (2016-08-05 16:30:50)
+3. Non-functional Requirements
+Performance Indicators
+
+Time accuracy: DS1302 clock error ≤2ppm (annual error of about 1 minute).
+
+Display refresh rate: 1Hz (time display updated once per second).
+
+Key response delay: ≤100ms (including de-jittering delay).
+
+Alarm clock triggering accuracy: second-level matching, error ≤ 1 second.
+
+Hardware constraints
+
+Main control chip: STC89C52RC microcontroller, 12MHz crystal.
+
+Clock module: DS1302 chip, support SPI communication, built-in battery backup.
+
+Display module: LCD1602, 4-bit data bus mode (RS→P2.7, RW→P2.6, EN→P2.5).
+
+Input module: 5 independent buttons (Setup, Alarm, Plus, Minus, Confirm), connected to port P3.
+
+Output module: Buzzer (P2.0), supports PWM control of beep frequency.
+
+Reliability requirements
+
+Continuous operation time: ≥24×7 hours.
+
+Operating temperature range: -20℃~70℃.
+
+Data retention life: EEPROM erase and write times ≥ 100,000 times.
+
+4. System Design
+4.1 Hardware Design
+Module Configuration Description
+Main control circuit STC89C52 minimum system (including reset circuit, 12MHz crystal)
+Clock module DS1302 connected to the P1 port (RST→P1.3, SDA→P1.2, SCK→P1.1)
+Display module LCD1602 data bus connected to port P0, control lines RS→P2.7, RW→P2.6, EN→P2.5
+Memory module MCU internal EEPROM, address 0x2000-0x2002 storage alarm clock configuration
+Human-computer interface Key (setting, alarm, plus and minus) connected to P3.2-P3.5, buzzer connected to P2.0
+4.2 Software Design
+Main programme flow
+
+plaintext
+Copy
+Initialisation → read DS1302 time → enter main loop.  
+  1. Refresh LCD display  
+  2. Detect key input:  
+     - Setting key: enter time calibration mode  
+     - Alarm key: Enter alarm setting mode  
+  3. Check the alarm trigger condition  
+  4. 100ms delay time → repeat cycle  
+Key Logic
+
+Time calibration:
+
+User adjusts the year, month, day of the week, hour, minute and second by plus and minus keys, and write to DS1302 after confirmation.
+
+Data format conversion: Decimal ↔ BCD code (e.g. ‘16’ → 0x16).
+
+Alarm clock saving:
+
+Alarm clock time (hour, minute) and switch state are saved to EEPROM address 0x2000-0x2002.
+
+Data checking is performed when reading (hour ≤ 23, minute ≤ 59, switch state 0/1).
+
+Buzzer control:
+
+When the alarm is triggered, the buzzer sounds at a frequency of 0.2Hz (0.1 second on, 0.1 second off), and continues until the user presses the key or stops automatically after 59 seconds.
+
+5. Test Verification
+Test item Expected result Passing standard
+Time display initialisation LCD display default time (2016-08-05 16:30:50) Time format and value are correct
+Manual time calibration The adjusted time is written into DS1302 and displayed The measured time is the same as the set value, and the error is ≤1 second.
+Alarm clock setting and saving Restart the system after setting the alarm time, the configuration will not be lost EEPROM readout value is the same as the set value.
+Alarm trigger Arrive at the set time buzzer buzzer at a frequency of 0.2Hz, continuous to the operation
+Key Response The system responds instantly when the key is pressed, no delay, repeated triggering or missed detection.
+6. Dependencies
+Hardware Dependencies
+
+DS1302 clock module, LCD1602 display, 5V regulated power supply.
+
+Buzzer, key module, STC89C52 development board.
+
+Software dependencies
+
+Keil C51 development environment, supporting 8051 instruction set and timer interrupt configuration.
+
+DS1302 driver library (requires custom SPI communication logic).
+
+7. Limitations and Extensions
+Current Limitations
+
+Only support 24-hour system, no 12-hour system switching function.
+
+Alarm clock only supports single group time setting, does not support multiple groups of alarm clocks.
+
+Expansion direction
+
+Add temperature display: integrate DS18B20 temperature sensor, expand ambient temperature display function.
+
+Multi-alarm clock support: Expand storage space through EEPROM, support setting more than 3 groups of alarm clock.
+
+Wireless synchronisation: add Bluetooth module, support mobile phone APP to synchronise time and alarm clock setting.
+
+8. Appendix
+Pin Assignment Table
+
+Function MCU Pin Peripheral Pin
+DS1302 RST P1.3 DS1302 CE
+DS1302 SDA P1.2 DS1302 IO
+DS1302 SCK P1.1 DS1302 SCK
+LCD RS P2.7 LCD RS
+LCD RW P2.6 LCD RW
+LCD EN P2.5 LCD EN
+DS1302 Register Description
+
+Register Address Function Data Format
+0x80 Seconds Register BCD Code (00-59)
+0x82 Minute register BCD code (00-59)
+0x84 Hour register BCD code (00-23)
+0x8A Week register BCD code (01-07) 

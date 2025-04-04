@@ -1,0 +1,84 @@
+System Requirements Document
+1. System Overview
+This system is based on 8051 microcontroller and realises text scrolling display function through LCD1602 display. Users can select vertical or horizontal scrolling mode by pressing key, and support external interrupt to control scrolling pause/resume. The system displays a prompt message after initialisation, switches the display mode when triggered by a key, and the text content is read from a predefined array and dynamically scrolled.
+
+2. Detailed Functional Requirements
+Key Function
+
+K1 (P3.0): Trigger Vertical Scroll (V_Scroll_Display) to display multi-paragraphs of text by scrolling line by line.
+
+K2 (P3.1): Trigger horizontal scrolling (H_Scroll_Display), text scrolls smoothly from left to right.
+
+K3 (P3.2): function not implemented in the code, reserved for extension.
+
+Display Functions
+
+Initialisation display: display the prompt message ‘PRESS K1--K4 TO START DEMO PROG’ after power on.
+
+Vertical scrolling: text scrolls upward line by line, automatically line feeds and handles spaces.
+
+Horizontal scrolling: text scrolls smoothly from right to left, supports two lines to be displayed alternately.
+
+Pause control: When external interrupt is triggered (EX_INT0), scrolling is paused/resumed by flag bit F0.
+
+Interrupt Function
+
+External interrupt 0 (INT0): used to toggle scrolling pause state (F0 = !F0), interrupt triggering mode is falling edge (IT0 = 1).
+
+3. Pin Definition
+Module Pin Function
+LCD1602 RS (P2.0) Register selection (command/data)
+RW (P2.1) Read/Write Control
+EN (P2.2) Enable Signal
+P0 8-bit data bus
+Key K1 (P3.0) Vertical scroll trigger
+K2 (P3.1) Horizontal scroll trigger
+K3 (P3.2) Reserved unused
+Interrupt INT0 (P3.2) External interrupt 0 to pause/resume scrolling
+4. Function Verification
+Key Response Verification
+
+When K1 is pressed, the LCD displays the text scrolling vertically and stays about 150ms per line.
+
+After pressing K2, the LCD displays text scrolling horizontally, staying about 20ms per frame.
+
+Interrupt Verification
+
+Trigger INT0 (e.g. press the key connected to P3.2) and observe whether scrolling is paused/resumed.
+
+Display content verification
+
+Initial prompt message is displayed in two lines with complete and missing content.
+
+The text is coherent during scrolling, with no garbled code or out-of-bounds phenomenon.
+
+Boundary conditions verification
+
+The space at the end of the text is automatically filled to ensure that the display buffer is empty.
+
+When switching between multiple lines of text, there is no problem of array boundary crossing (it should be noted that Line_Count matches the length of the Msg array).
+
+5. Core functions and logic
+Delay function
+
+Delayxms(uint ms): rough delay, used to control the scrolling speed.
+
+Delayms(uint ms) (LCD driver): precise delay, to ensure the timing of LCD operation.
+
+Scroll Logic
+
+Vertical scrolling:
+
+Each frame fills 16 characters to the buffer, the first and last spaces are automatically skipped.
+
+Refresh LCD two lines alternately to achieve scrolling effect.
+
+Horizontal scrolling:
+
+Use 32 character buffer, cycle left to achieve smooth scrolling.
+
+Two lines are displayed alternately (L = (L==0)? 1:0).
+
+Interrupt service function
+
+EX_INT0() interrupt 0: Toggle F0 flag bit to control scrolling pause.

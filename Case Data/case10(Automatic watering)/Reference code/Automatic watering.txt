@@ -1,0 +1,274 @@
+#include <reg52.h>
+#include <intrins.h>
+
+#define uchar unsigned char
+#define uint unsigned int
+
+// 数码管显示段码表
+uchar code smg_du[] = {
+    0xc0, 0xf9, 0xa4, 0xb0, 0x99, 0x92, 0x82, 0xf8, 
+    0x80, 0x90, 0x88, 0x83, 0xc6, 0xa1, 0x86, 0x8e
+};
+
+// 数码管位选信号
+sbit smg_we1 = P2^0;
+sbit smg_we2 = P2^2;
+sbit smg_we3 = P2^4;
+sbit smg_we4 = P2^6;
+
+// ADC0832接口定义
+sbit SCL = P1^2;  // 时钟信号
+sbit DO = P1^3;   // 数据输出
+sbit CS = P1^0;   // 片选信号
+
+// 水泵控制接口
+sbit dianji = P3^5;
+
+// 全局变量
+uchar dis_smg[8] = {0x14, 0x77, 0x4c, 0x45, 0x27, 0x85, 0x84};  // 数码管显示缓存
+uchar shidu;       // 湿度值
+uchar s_high = 70; // 湿度上限
+uchar s_low = 25;  // 湿度下限
+uchar flag_200ms;  // 200ms计时标志
+uchar key_can;     // 按键值
+uchar menu_1;      // 菜单控制变量
+
+// 延时函数，单位1ms
+void delay_1ms(uint q)
+{
+    uint i, j;
+    for(i = 0; i < q; i++)
+        for(j = 0; j < 120; j++);
+}
+
+// 数码管位选控制函数
+void smg_we_switch(uchar i)
+{
+    switch(i)
+    {
+        case 0: smg_we1 = 1; smg_we2 = 0; smg_we3 = 0; smg_we4 = 0; break;
+        case 1: smg_we1 = 0; smg_we2 = 1; smg_we3 = 0; smg_we4 = 0; break;
+        case 2: smg_we1 = 0; smg_we2 = 0; smg_we3 = 1; smg_we4 = 0; break;
+        case 3: smg_we1 = 0; smg_we2 = 0; smg_we3 = 0; smg_we4 = 1; break;
+    }
+}
+
+// 数码管显示函数
+void display()
+{
+    static uchar i;
+    i++;
+    if(i >= 4)
+        i = 0;
+    P0 = 0xff;         // 消隐
+    smg_we_switch(i);  // 位选
+    P0 = dis_smg[i];   // 段选
+}
+
+// ADC0832读取函数
+unsigned char ad0832read(bit SGL, bit ODD)
+{
+    unsigned char i = 0, value = 0, value1 = 0;
+    
+    SCL = 0;
+    DO = 1;
+    CS = 0;    // 开始
+    SCL = 1;   // 第一个上升沿
+    SCL = 0;
+    DO = SGL;
+    SCL = 1;   // 第二个上升沿
+    SCL = 0;
+    DO = ODD;
+    SCL = 1;   // 第三个上升沿
+    SCL = 0;   // 第三个下降沿
+    DO = 1;
+    
+    // 读取8位数据
+    for(i = 0; i < 8; i++)
+    {
+        SCL = 1;
+        SCL = 0;  // 开始从第四个下降沿开始读数
+        value = value << 1;
+        if(DO)
+            value++;
+    }
+    
+    // 读取校验数据
+    for(i = 0; i < 8; i++)
+    {
+        value1 >>= 1;
+        if(DO)
+            value1 += 0x80;
+        SCL = 1;
+        SCL = 0;
+    }
+    
+    SCL = 1;
+    DO = 1;
+    CS = 1;
+    
+    // 数据校验
+    if(value == value1)
+        return value;
+    return 0;
+}
+
+// 按键扫描函数
+void key()
+{
+    static uchar key_new;
+    key_can = 20;               // 按键值复原
+    P1 |= 0xf0;                 // 设置P1.4-P1.7为输入
+    if((P1 & 0xf0) != 0xf0)     // 有按键按下
+    {
+        delay_1ms(1);           // 按键消抖
+        if(((P1 & 0xf0) != 0xf0) && (key_new == 1))
+        {                       // 确认是按键按下
+            key_new = 0;
+            switch(P1 & 0xf0)
+            {
+                case 0x70: key_can = 1; break;  // 设置键
+                case 0xb0: key_can = 2; break;  // 增加键
+                case 0xd0: key_can = 3; break;  // 减少键/手动控制键
+            }
+        }
+    }
+    else 
+        key_new = 1;
+}
+
+// 按键处理函数
+void key_with()
+{
+    // 手动模式下的水泵控制
+    if(menu_1 == 0)
+    {
+        if(key_can == 3)   // 手动开启水泵
+            dianji = 0;    // 开启水泵
+        if(key_can == 2)
+            dianji = 1;    // 关闭水泵
+    }
+
+    // 设置键处理
+    if(key_can == 1)  // 设置键
+    {
+        menu_1++;
+        if(menu_1 >= 3)
+        {
+            menu_1 = 0;
+        }
+    }
+    
+    // 湿度上限设置
+    if(menu_1 == 1)
+    {
+        if(key_can == 2)
+        {
+            s_high++;      // 湿度上限值加1
+            if(s_high > 99)
+                s_high = 99;
+        }
+        if(key_can == 3)
+        {
+            s_high--;      // 湿度上限值减1
+            if(s_high <= s_low)
+                s_high = s_low + 1;
+        }
+        dis_smg[0] = smg_du[s_high % 10];         // 个位显示
+        dis_smg[1] = smg_du[s_high / 10 % 10];    // 十位显示
+        dis_smg[2] = 0xa1;
+        dis_smg[3] = 0x8b;  // H
+    }
+    
+    // 湿度下限设置
+    if(menu_1 == 2)
+    {
+        if(key_can == 2)
+        {
+            s_low++;       // 湿度下限值加1
+            if(s_low >= s_high)
+                s_low = s_high - 1;
+        }
+        if(key_can == 3)
+        {
+            s_low--;       // 湿度下限值减1
+            if(s_low <= 1)
+                s_low = 1;
+        }
+        dis_smg[0] = smg_du[s_low % 10];          // 个位显示
+        dis_smg[1] = smg_du[s_low / 10 % 10];     // 十位显示
+        dis_smg[2] = 0xa1;
+        dis_smg[3] = 0xc7;  // L
+    }
+}
+
+// 电机控制函数
+void dianji_kongzi()
+{
+    static uchar value, value1;
+    
+    // 湿度低于下限，启动水泵
+    if(shidu <= s_low)
+    {
+        value++;
+        if(value >= 2)
+        {
+            value = 10;
+            dianji = 1;    // 开启水泵
+        }
+    }
+    else 
+        value = 0;
+    
+    // 湿度高于上限，关闭水泵
+    if(shidu >= s_high)
+    {
+        value1++;
+        if(value1 >= 2)
+        {
+            value1 = 10;
+            dianji = 0;    // 关闭水泵
+        }
+    }
+    else 
+        value1 = 0;
+}
+
+// 主函数
+void main()
+{
+    delay_1ms(100);
+    P0 = P1 = P2 = P3 = 0xff;   // 初始化IO口
+    
+    while(1)
+    {
+        key();                  // 按键扫描函数
+        if(key_can < 10)
+        {
+            key_with();         // 按键处理函数
+        }
+        
+        flag_200ms++;
+        if(flag_200ms >= 200)
+        {
+            flag_200ms = 0;
+            P0 = 0xff;          // 消隐
+            
+            if(menu_1 == 0)
+            {
+                shidu = ad0832read(1, 0);  // 读取湿度
+                shidu = shidu * 99 / 255;  // 转换为0-99范围
+                
+                dis_smg[0] = 0xff;
+                dis_smg[1] = smg_du[shidu % 10];         // 湿度个位
+                dis_smg[2] = smg_du[shidu / 10 % 10];    // 湿度十位
+                dis_smg[3] = 0xff;
+                
+                dianji_kongzi();  // 电机控制函数
+            }
+        }
+        
+        display();    // 数码管显示函数
+        delay_1ms(1);
+    }
+}

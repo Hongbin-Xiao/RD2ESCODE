@@ -1,0 +1,115 @@
+Phone Number Input and Display System Requirements Document
+1. System Overview
+This system is based on AT89X52 microcontroller, through the 4x3 matrix keyboard and LCD1602 display to achieve the phone number input and display functions. The core functions include:
+
+Phone number input: input numbers (0-9, *, #) through the matrix keyboard, the maximum support for 11-digit number input.
+
+Real-time display: LCD1602 displays the title (--Phone Code--) and the entered phone number in two lines.
+
+Input management: Automatically clear the screen and restart input when inputting more than 11 digits.
+
+Hardware Interaction: Supports keypad dithering detection and LCD dynamic refresh.
+
+2. Detailed Functional Requirements
+2.1 Keyboard Input Module
+4x3 matrix keyboard:
+
+Key layout:
+
+plaintext
+Copy
+1 2 3  
+4 5 6  
+7 8 9  
+* 0 #  
+Scanning Logic: Adopting row and column scanning method, the high 4 bits of P3 port output the row signal and the low 4 bits read the column signal.
+
+Coding method: each key corresponds to a unique code (0-11), which is converted to characters by looking up the table (Key_Table[]).
+
+2.2 LCD Display Module
+Display content:
+
+The first line fixedly displays the title: -Phone Code-.
+
+The second line dynamically displays the entered phone number (up to 11 digits).
+
+Display control:
+
+Initialisation: set display mode (16x2), clear screen, cursor not displayed.
+
+Dynamic refresh: update the display in real time when new characters are entered, clear the screen and reset when more than 11 digits are entered.
+
+2.3 Input Management Module
+Input Limit: Support inputting 11 characters at most, clear the screen and restart inputting automatically after exceeding.
+
+Input processing:
+
+After each key input, the characters are stored into Dial_Code_Str[] array and refresh the display.
+
+After the input is completed or the limit is exceeded, you need to clear it manually or wait for automatic reset.
+
+3. Pin Definition
+Peripheral Module Pin Definition Function
+LCD1602 RS = P2^0 Register selection (command/data)
+RW = P2^1 read/write control (low for write)
+EN = P2^2 Enable signal
+Data bus = P0 8-bit parallel data
+Matrix Keypad P3 (high 4-bit output, low 4-bit input) 4x3 Keypad row and column scan signal
+4. Functional Verification
+4.1 Keyboard Input Verification
+Test Steps:
+
+Press all keys of the keyboard (0-9, *, #) in sequence and observe whether the second line of the LCD displays the corresponding characters.
+
+Press several keys in quick succession to check whether there is any false trigger or missed detection.
+
+Expected result: All key inputs are accurately recognised and the display has no delay or misalignment.
+
+4.2 Display Function Verification
+Test Steps:
+
+Input 12-bit characters (e.g. 12345678901*) and check whether the screen is cleared after the 12th bit is input.
+
+Observe whether the LCD refreshes smoothly without flickering or residual shadow during input.
+
+Expected result: The screen is cleared automatically after the input limit is exceeded and the display is updated in real time.
+
+4.3 Input Management Verification
+Test Steps:
+
+Input 11-digit characters and then continue to input, check whether the screen is cleared and restart.
+
+Press an invalid key (e.g. undefined key) during the input process and check whether the system ignores it.
+
+Expected Result: Input management logic is strict, no out-of-bounds or abnormal processing.
+
+5. Numerical or formula calculation function
+5.1 Keypad coding table
+Coding logic:
+
+c
+Copy
+unsigned char KeyCodeTable[] = {0xee,0xed,0xeb,0xde,0xdd,0xdb,0xbe,0xbd,0xbb,0x7e,0x7d,0x7b};  
+// Scan code corresponding to keys 1-9, *, 0, #.  
+5.2 Display Position Setting
+Code logic:
+
+c
+Copy
+void LCD_Pos(unsigned char pos) {  
+  LCD_Write_Command(pos | 0x80); // set the DDRAM address (0x00 for the first line, 0x40 for the second line)  
+}  
+5.3 Input Character Management
+Boundary handling:
+
+c
+Copy
+if (++i == 12) { // clear screen if input exceeds 11 bits  
+  for (j=0; j<16; j++) Dial_Code_Str[j] = ‘ ’;  
+  i = 0; }  
+}  
+Remarks:
+
+Keyboard dithering is achieved by software delay (while(GetKey()! = 0xff)) to ensure stable key detection.
+
+The LCD display refresh frequency is controlled by the main loop, which should avoid the display lagging due to long time blocking.

@@ -1,0 +1,128 @@
+DS18B20 Multi-Channel Temperature Monitoring System Requirements Documentation
+1. System Overview
+Based on the AT89X52 microcontroller, this system achieves multi-channel temperature acquisition through DS18B20 digital temperature sensors and real-time display of temperature values using LCD1602 display. The system supports 8 DS18B20 sensors and achieves multi-channel switching through ROM serial number matching, with the following core functions:
+
+Multi-channel temperature sensor automatic polling acquisition
+
+Temperature data analysis (including positive and negative temperature, decimal place processing)
+
+LCD1602 real-time display of temperature values (format: XX.X°C)
+
+Single bus communication protocol (1-Wire) driver implementation
+
+2. Detailed functional requirements
+2.1 Hardware Module Functions
+LCD1602 display module
+
+Initial display mode: 2 lines, 5x7 dots, no cursor, text shifted to the right.
+
+Display fixed title ‘Temperature’ (first line centred)
+
+Dynamic display of the temperature value (format of the second line: -XX.X or XX.X)
+
+DS18B20 Sensor Module
+
+Supports 8 sensors, matched by predefined ROM serial numbers
+
+Temperature conversion start-up, data reading, symbol handling (positive/negative temperature)
+
+Temperature resolution: 0.0625°C (raw data conversion processing)
+
+Single bus communication protocol
+
+Initialisation, read/write timing control
+
+Support for ROM matching instructions (MATCH_ROM) and skip instructions (SKIP_ROM)
+
+2.2 Software Functions
+Initialisation process
+
+LCD initialisation (display mode, clear screen)
+
+DS18B20 bus reset detection
+
+Temperature acquisition and processing
+
+Polling 8 sensors (switching ROM serial number by switch statement)
+
+Read raw 16-bit temperature data and parse it into integer and decimal parts.
+
+Symbol processing: detect the highest bit to judge positive and negative, take the complement of the negative number.
+
+Data display
+
+Dynamically updating LCD sub-line contents (integer, decimal, fractional digits)
+
+Negative sign display control
+
+3. Pin Definition
+Pin Function
+P1 LCD1602 data bus (8-bit)
+P2^0 (RS) LCD register selection (0=instruction, 1=data)
+P2^1 (RW) LCD read/write control (0=write, 1=read)
+P2^2 (E) LCD enable signal
+P2^7 (DQ) DS18B20 single bus data line
+4. Function Verification
+4.1 LCD Display Verification
+The LCD should display the first line title ‘Temperature’ after power on.
+
+The initial display format of the second line is XX.X (including decimal point) with no garbled code.
+
+When the temperature is negative, the first line of the second line displays a negative sign ‘-’.
+
+4.2 Temperature Acquisition Verification
+Single sensor test: comment the switch code block and enable SKIP_ROM instruction to verify the accuracy of single data.
+
+Multi-sensor test: Match the 8 ROM serial numbers sequentially to confirm the polling logic is normal.
+
+Temperature range test:
+
+Positive temperature: 0°C ~ 125°C
+
+Negative Temperature: -55°C ~ 0°C
+
+Decimal digit accuracy: 0.0, 0.5 (e.g. 25.5°C)
+
+4.3 Communication Protocol Verification
+Use an oscilloscope to check the DQ pin timing:
+
+Reset pulse (480μs low level)
+
+Write ‘1’ timing (1μs low + 60μs high)
+
+Read timing (16μs sampling window)
+
+5. Numerical Calculations and Equations
+5.1 Temperature Data Analysis
+Raw Data Format:
+
+16-bit binary, high bit is sign bit (0=positive, 1=negative).
+
+Example: 0x0190 means 25.0°C, 0xFF6E means -10.5°C.
+
+Conversion formula:
+
+Integer part: Temp = (RawData >> 4) & 0x7FF
+
+Decimal part: Decimal = (RawData & 0x0F) * 0.0625
+
+Actual temperature: Temp + Decimal
+
+The code implements the logic:
+
+c
+Copy
+// Example code snippet  
+iTempDataH = (RawData >> 4); // Extract integer part  
+btDot = (RawData & 0x0F) * 5 >> 3; // Fractional part converted to 0.1°C accuracy  
+5.2 Symbol handling
+Detect the highest bit (iTempDataH & 0x8000) and take the complement if it is negative:
+
+c
+Copy
+iTempDataH = ~iTempDataH + 1;  
+6. Remarks
+ROM sequence number: need to get the actual sensor ROM through GetROMSequence() function (enabled during debugging).
+
+Delay Function: Timing accuracy depends on Delay16us(), Delay60us() and other functions, which need to be calibrated according to the actual clock frequency.
+
