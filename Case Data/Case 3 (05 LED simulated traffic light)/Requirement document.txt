@@ -1,0 +1,25 @@
+System Overview
+
+This system is developed based on the 8051 microcontroller and uses programming to control six LED lights on the P0 port, simulating the logical control of a bidirectional (Direction A and Direction B) traffic light system. The system adopts a state machine design, consisting of four core working states that automatically cycle through the following process:
+
+1. **Direction A Green Light Pass**: The green light in Direction A turns on to allow passage, while the red light in Direction B turns on to prohibit passage, lasting for 2000 milliseconds.
+
+2. **Direction A Yellow Light Warning**: The yellow light in Direction A flashes 10 times at a cycle of 200 milliseconds (totaling 2 seconds), indicating an imminent signal change.
+
+3. **Direction B Green Light Pass**: The system switches to Direction B, where the green light turns on to allow passage, and the red light in Direction A turns on to prohibit passage, also lasting for 2000 milliseconds.
+
+4. **Direction B Yellow Light Warning**: The yellow light in Direction B flashes 10 times following the same rules, after which the system returns to the initial state, forming a complete cycle (totaling approximately 8000 milliseconds).
+
+### Core Function Description
+
+#### Hardware Configuration
+
+- **Main Control Chip**: Uses the STC89C52 microcontroller with a 12 MHz crystal oscillator providing clock signals.
+
+- **Traffic Light Interface**: Six pins on the P0 port control the traffic lights for both directions:
+  - **P0.0~P0.2**: Red, yellow, and green lights for Direction A (low level turns on the light).
+  - **P0.3~P0.5**: Red, yellow, and green lights for Direction B (low level turns on the light).
+
+- **Driver Design**: LED lights require external current-limiting resistors, with high-brightness LEDs used for red lights to meet the requirements of traffic scenarios.
+
+- **Delay Control**: The `DelayMS()` function is used to achieve precise timing, with a delay of 2000 milliseconds for the green/red light stages and 200 milliseconds for each yellow light flash.

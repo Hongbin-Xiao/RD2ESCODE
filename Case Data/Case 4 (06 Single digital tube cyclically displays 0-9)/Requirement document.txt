@@ -1,0 +1,35 @@
+Requirement Document: Digital Tube Cyclic Display System Based on 8051 Microcontroller
+
+### System Overview
+This system is developed based on the 8051 series microcontroller (e.g., STC89C52) and drives a single common-cathode digital tube to cyclically display numbers 0-9 by controlling the segment code data output through the P0 port. The system automatically switches the display content at fixed time intervals (200ms) to create a dynamic numeric increment effect, suitable for basic numeric display scenarios such as counters and timers.
+
+### Core Function Description
+
+#### Display Function
+- **Numeric Cyclic Display**: The digital tube sequentially displays numbers 0 to 9, with each number staying visible for 200ms before automatically switching to the next number.
+- **Segment Code Control Logic**:
+  - A predefined segment code table `DSY_CODE[]` stores the common-anode encoding for numbers 0-9.
+  - The statement `P0=~DSY_CODE[i]` inverts the segment codes to match the voltage requirements of the common-cathode digital tube (high level lights up the segments).
+
+#### Hardware Configuration
+- **Main Control Chip**: STC89C52RC microcontroller with a 12MHz crystal oscillator providing the clock reference.
+- **Digital Tube Interface**:
+  - The P0 port directly drives the digital tube segment codes (a~dp pins), with external 220Ω current-limiting resistors to protect the LED segments.
+  - **Digital Tube Type**: Single common-cathode digital tube (e.g., 5161BS).
+- **Power Requirements**: 5V DC power supply, with the total system operating current ≤20mA.
+
+#### Software Logic
+- **Cyclic Control**: The variable `i` increments from 0 to 9 and then automatically resets to 0, achieving numeric cycling (`i=(i+1)%10`).
+- **Delay Mechanism**: The `DelayMS(200)` function uses nested loops to achieve approximately 200ms delay, controlling the display switching speed.
+- **Initialization Settings**: At program startup, `P0=0x00` is set to ensure the digital tube's initial state is completely off.
+
+> Note: The digital tube must be of the common-cathode type to match the inverted segment code logic.
+
+### Testing and Validation
+
+| **Test Item**               | **Expected Result**                         | **Passing Criteria**                                  |
+|-----------------------------|---------------------------------------------|-----------------------------------------------------|
+| Power-on Initialization     | Digital tube completely off                | P0 outputs `0xFF` (all segment codes at high level) |
+| Number 0 Display            | Digital tube displays number 0             | Segment code value is `0xC0` (inverted to `0x3F`)   |
+| Complete Cyclic Period      | Cycles through 0-9 with a period of 2000ms | Measured period error ≤±5%                          |
+| Low Voltage Stability Test  | No abnormal display with 4.5V-5.5V power   | No flickering or segment code errors observed       |

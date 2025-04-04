@@ -1,0 +1,65 @@
+# Requirements Document: 8051 Microcontroller-Based LED Flow Light Control System
+
+## 1. Project Overview
+This system is developed based on the 8051 series microcontroller (such as STC89C52) to achieve a flowing light effect with 8 LEDs by controlling GPIO port output level changes. The system illuminates LEDs sequentially at a fixed frequency, creating a visual dynamic flowing effect.
+
+## 2. Functional Requirements
+| Function ID | Function Description | Input/Trigger Condition | Output/Response Result |
+|-------------|---------------------|------------------------|------------------------|
+| F1 | LED flowing light cycle | Automatic operation upon power-up | 8 LEDs light up sequentially |
+| F2 | Single light movement interval control | Built-in 150ms delay parameter | Light switches once every 150ms |
+
+## 3. Non-Functional Requirements
+### Performance Requirements
+- LED refresh rate: approximately 6.67 Hz (each LED maintains for 150ms)
+
+### Hardware Constraints
+- Microcontroller model: Compatible with 8051 architecture
+- Port requirements: P0 port requires external current-limiting resistors (typical values 220Ω-1kΩ)
+- LED driving method: Low level active (common anode connection)
+
+## 4. System Design
+### Hardware Design
+| Module | Configuration Description |
+|--------|---------------------------|
+| Main controller | STC89C52RC (12MHz crystal oscillator) |
+| LED array | 8-bit common anode LED module connected to P0 port |
+| Power supply | 5V DC ±5% |
+
+### Software Design
+#### Main Program Flow
+```
+Start → P0 initialization → Enter main loop:
+   1. Rotate P0 port data left
+   2. Delay 150ms
+   3. Repeat loop
+```
+
+```
+// Rotate left function
+P0 = _crol_(P0, 1);  // Rotate left 1 bit each time
+```
+
+## 5. Test Verification
+| Test Item | Expected Result | Pass Criteria |
+|-----------|-----------------|---------------|
+| Power-on initialization | LED1 lights up, others off | P0=0xFE (11111110b) |
+| First shift | LED2 lights up, others off | P0=0xFD (11111101b) |
+| Cycle period test | Complete 8-LED cycle period = 1200ms±5% | Measured value 1200ms±60ms |
+
+```c
+_crol_()        // Circular left rotation function from intrins.h
+DelayMS(150)    // Actual delay ≈150ms (12MHz clock)
+```
+
+### LED Status Table
+| Step | P0 Value (HEX) | LED Position |
+|------|----------------|--------------|
+| 0 | 0xFE | LED1 |
+| 1 | 0xFD | LED2 |
+| ... | ... | ... |
+| 7 | 0x7F | LED8 |
+
+Document Version: V1.1  
+Last Updated: YYYY-MM-DD  
+Author: Embedded Systems Engineer

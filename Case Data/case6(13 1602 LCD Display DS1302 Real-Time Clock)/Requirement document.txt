@@ -1,0 +1,65 @@
+Requirements document: 8051 microcontroller-based real-time clock (RTC) and LCD display system
+System Overview
+This system is designed based on 8051 microcontroller (e.g. STC89C52), acquires accurate time data through DS1302 real-time clock module, and drives 16x2 character LCD display to show date, time and day of the week information in real time. The system supports the following core functions:
+
+Real-time time display: display date (format: DATE 00-00-00) and day of the week (e.g. SUN/MON) on the first line of LCD, and display time (format: TIME 00:00:00) on the second line.
+
+Data synchronisation: communicates with DS1302 module via SPI protocol and updates time data once per second.
+
+Dynamic Formatting: Convert binary time data to ASCII characters, adapting to LCD display requirements.
+
+Hardware Configuration
+Main control chip: STC89C52RC microcontroller, 12MHz crystal.
+
+Peripheral module:
+
+DS1302 real-time clock module: connected through P1.0 (IO), P1.1 (SCLK), P1.2 (RST), providing year, month, day, hour, minute, second and week data.
+
+16x2 LCD display: connected via P2.0 (RS), P2.1 (RW), P2.2 (EN) and P0 port (data bus), supports standard 4-bit or 8-bit operation mode.
+
+Power requirements: 5V DC power supply, peak current ≤ 50mA.
+
+Software Function
+DS1302 driver
+
+Data reading and writing: SPI communication is achieved through the Write_A_Byte_TO_DS1302 and Get_A_Byte_FROM_DS1302 functions, which reads 7 bytes of time data (second, minute, hour, day, month, year, week).
+
+Data parsing: GetTime function reads the time data cyclically and stores it into DateTime array in the format of decimal value.
+
+LCD display control
+
+Initialisation: Init_LCD function sets the display mode (0x38), clear the screen (0x01), move the cursor to the right (0x06), display on (0x0C).
+
+Dynamic refresh: The main loop calls Display_LCD_String every second to write the formatted date and time string to the specified line of LCD (0x00 and 0x40 addresses).
+
+Data Formatting: The Format_DateTime function converts decimal values to ASCII characters (e.g. 25→‘2’‘5’) and updates the display buffer.
+
+Exception Handling
+
+LCD Busy Detection: LCD_Busy_Wait function ensures that the LCD is in an idle state before each operation to avoid data conflicts.
+
+
+Test Validation
+Test Item Expected Result Passing Criteria
+DS1302 initialisation Time data is correctly read DateTime array value is current time.
+LCD display initialisation The screen is cleared, the cursor is in the upper left corner, and the display is blank with no residual characters.
+DateTime formatting Numeric value 25 is displayed as ‘25’ LCD_BUFFER content is consistent with data
+LCD_BUFFER content is consistent with the data. Full-function operation test LCD two lines respectively display the date and time Updated once per second, no flicker or misalignment
+Power switching test No loss of time data when main power is disconnected Continuous time after powering up again
+Limit and optimisation direction
+Current Limitations
+
+Only support fixed date format (00-00-00), can not customise the display order (such as MM-DD-YY).
+
+
+Appendix
+Pin Assignment Table
+
+Function MCU Pin Peripheral Pin
+DS1302 IO P1.0 DS1302 SDA
+DS1302 SCLK P1.1 DS1302 SCLK
+DS1302 RST P1.2 DS1302 CE
+LCD RS P2.0 LCD RS
+LCD RW P2.1 LCD RW
+LCD EN P2.2 LCD EN
+LCD Data Bus P0.0-P0.7 LCD DB0-DB7

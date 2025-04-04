@@ -1,0 +1,25 @@
+Requirement document: 8051 microcontroller based keypad control LED flow direction system
+This system is designed based on 8051 microcontroller (e.g. STC89C52) to control the LED flow direction of P0 and P2 ports through key input of P1 port to achieve dynamic light effect switching. The system supports the following functions:
+
+Key control logic:
+
+P1.4 (0x10) is pressed: the LED of P0 port is shifted right (_cror_) to form a right-to-left flow effect.
+
+P1.5 (0x20) pressed: P0 port LED shifted left (_crol_) to form a left-to-right flow effect.
+
+P1.6 (0x40) is pressed: the P2 port LED is shifted right (_cror_). Creates a right-to-left flow effect.
+
+P1.7 (0x80) is pressed: the P2 port LED is shifted left (_crol_). Creates a left-to-right flow effect.
+
+Hardware Configuration:
+
+The main control chip using 12MHz crystal, P0 and P2 port each connected to 8-bit LED (low-level drive), need to be connected to an external 220Ω current-limiting resistor.
+
+P1 port connected to four independent keys (P1.4 ~ P1.7), the corresponding pin when the key is pressed to ground (active low).
+
+Software logic:
+
+Initialisation sets P0 and P2 ports to 0xFE (only the lowest LED is lit).
+
+The main loop continuously detects the state change of P1 port, if the key is pressed (state change), it immediately triggers the LEDs to move and delays the dithering for 10ms.
+Each led is lit for one second during the flow effect.
