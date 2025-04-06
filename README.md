@@ -1,7 +1,9 @@
 # RD2ESCODE: Automated Transformation of Requirements Documents into Embedded System Code
 
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Version](https://img.shields.io/badge/version-1.0.0-green)
+![FIG 1 - 副本_00](https://github.com/user-attachments/assets/8dd262fc-b707-4264-8e5d-01ba9e3fa2f9)
+
+![fig3_00](https://github.com/user-attachments/assets/5e71793b-0f87-4daf-bf47-7cd0c24254df)
+
 ![Python](https://img.shields.io/badge/python-3.7+-orange)
 
 ## 📝 Overview
