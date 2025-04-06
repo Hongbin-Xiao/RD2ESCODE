@@ -1,4 +1,0 @@
-"STARTUP.obj",
-"led.obj" 
-TO "led" 
-RAMSIZE(256) 
