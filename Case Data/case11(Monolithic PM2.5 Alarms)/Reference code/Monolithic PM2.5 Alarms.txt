@@ -1,0 +1,466 @@
+#include <reg52.h>
+#include <intrins.h>
+#include <absacc.h>
+#include <math.h>
+
+#define uchar unsigned char
+#define uint unsigned int
+
+//定义LCD1602端口
+sbit E=P2^6;        //1602使能引脚
+sbit RS=P2^7;       //1602数据/命令选择引脚
+sbit RW=P2^5;
+
+sbit LED_RED=P2^2;
+sbit LED_YELLOW=P2^1;
+sbit LED_GREEN=P2^0;
+sbit SET_KEY=P3^4;
+sbit ADD_KEY=P3^5;
+sbit SUB_KEY=P3^6;
+sbit BUZZ=P3^7;
+sbit jdq=P2^4;
+
+// ADC0832引脚定义
+sbit CS   = P1^3;
+sbit Clk  = P1^0;
+sbit DATI = P1^1;
+sbit DATO = P1^1;
+
+int WARNING=250;
+uint DA;
+bit FlagStartRH=0;
+bit flag_BJ=0;
+bit set=0;
+
+// ADC0832全局变量
+unsigned int dat = 0x00;      //AD值
+unsigned char CH;             //通道标志
+unsigned char data dis[] = {0x00, 0x00, 0x00, 0x00};  //显示数值
+
+void L1602_string(uchar hang, uchar lie, uchar *p);
+
+// ADC0832函数实现
+unsigned char adc0832(unsigned char CH)
+{
+    unsigned char i, test, adval;
+    adval = 0x00;
+    test = 0x00;
+    Clk = 0;       //初始化
+    DATI = 1;
+    _nop_();
+    CS = 0;
+    _nop_();
+    Clk = 1;
+    _nop_();
+    
+    if (CH == 0x00)      //通道选择
+    {
+        Clk = 0;
+        DATI = 1;      //通道0的第一位
+        _nop_();
+        Clk = 1;
+        _nop_();
+        Clk = 0;
+        DATI = 0;      //通道0的第二位
+        _nop_();
+        Clk = 1;
+        _nop_();
+    } 
+    else
+    {
+        Clk = 0;
+        DATI = 1;      //通道1的第一位
+        _nop_();
+        Clk = 1;
+        _nop_();
+        Clk = 0;
+        DATI = 1;      //通道1的第二位
+        _nop_();
+        Clk = 1;
+        _nop_();
+    }
+    
+    Clk = 0;
+    DATI = 1;
+    for(i = 0; i < 8; i++)      //读取前8位数值
+    {
+        _nop_();
+        adval <<= 1;
+        Clk = 1;
+        _nop_();
+        Clk = 0;
+        if (DATO)
+            adval |= 0x01;
+        else
+            adval |= 0x00;
+    }
+    for (i = 0; i < 8; i++)      //读取后8位数值
+    {
+        test >>= 1;
+        if (DATO)
+            test |= 0x80;
+        else 
+            test |= 0x00;
+        _nop_();
+        Clk = 1;
+        _nop_();
+        Clk = 0;
+    }
+    if (adval == test)      //比较前8位和后8位数值，如果不相同，去掉（一直测试显示为零，请将此行去掉）
+        dat = test;
+    _nop_();
+    CS = 1;        //释放ADC0832
+    DATO = 1;
+    Clk = 1;
+    return dat;
+}
+
+//定时器0初始化
+void Timer0_Init()
+{
+    ET0 = 1;        //允许定时器0中断
+    TMOD = 0x11;    //定时器工作方式选择
+    TL0 = 0xb0;     
+    TH0 = 0x3c;     //定时器初始赋值
+    TR0 = 1;        //启动定时器
+    TL1 = 0xb0;     
+    TH1 = 0x3c;     //定时器初始赋值
+    ET1=1;
+    TR1=1;
+}
+
+//定时器0中断
+void Timer0_ISR (void) interrupt 1 using 0
+{
+    uchar RHCounter;
+    TL0 = 0xb0;
+    TH0 = 0x3c;     //定时器初始赋值
+    RHCounter++;
+    //每2秒进行一次温湿度转换
+    if (RHCounter >= 20)
+    {
+       FlagStartRH = 1;
+       RHCounter = 0;
+    }
+}
+
+//定时器1中断
+void Timer1_ISR (void) interrupt 3
+{
+    uchar RHCounter1;
+    TL1 = 0xb0;
+    TH1 = 0x3c;     //定时器初始赋值
+    RHCounter1++;
+    if(RHCounter1>=10)
+    {
+        RHCounter1=0;
+        if(flag_BJ==1)
+            BUZZ=!BUZZ;
+        else
+            BUZZ=1;
+    }
+}
+
+/********************************************************************
+* 延时函数
+*********************************************************************/
+void delay()
+{
+    int i,j;
+    for(i=0; i<=10; i++)
+        for(j=0; j<=2; j++);
+}
+
+void delay_ms(uint ms)
+{
+    uint i,j;
+    for(i=0;i<ms;i++)
+        for(j=0;j<110;j++);
+}     
+
+/********************************************************************
+* 名称 : enable(uchar del)
+* 功能 : 1602命令函数
+* 输入 : 输入命令参数值
+* 输出 : 无
+*********************************************************************/
+void enable(uchar del)
+{
+    P0 = del;
+    RS = 0;
+    E = 1;
+    delay();
+    E = 0;
+    delay();
+}
+
+/********************************************************************
+* 名称 : write(uchar del)
+* 功能 : 1602写数据函数
+* 输入 : 需要写入1602的数据
+* 输出 : 无
+*********************************************************************/
+void write(uchar del)
+{
+    P0 = del;
+    RS = 1;
+    E = 1;
+    delay();
+    E = 0;
+    delay();
+}
+
+/********************************************************************
+* 名称 : L1602_init()
+* 功能 : 1602初始化函数，参考1602的资料
+* 输入 : 无
+* 输出 : 无
+*********************************************************************/
+void L1602_init(void)
+{
+    enable(0x38);
+    enable(0x0c);
+    enable(0x06); 
+    enable(0x01); //这个很重要，清屏
+    enable(0x80);
+    L1602_string(1,1," PM2.5:   0ug/m3");
+    L1602_string(2,1," ALARM: 250ug/m3");
+}
+
+/********************************************************************
+* 名称 : L1602_char(uchar hang,uchar lie,char sign)
+* 功能 : 改变液晶的某位置值，比如要改第一行，第五列字符显示"b" ，调用该函数如下
+        L1602_char(1,5,'b')
+* 输入 : 行，列，需要输入1602的数据
+* 输出 : 无
+*********************************************************************/
+void L1602_char(uchar hang,uchar lie,char sign)
+{
+    uchar a;
+    if(hang == 1) a = 0x80;
+    if(hang == 2) a = 0xc0;
+    a = a + lie - 1;
+    enable(a);
+    write(sign);
+}
+
+/********************************************************************
+* 名称 : L1602_string(uchar hang,uchar lie,uchar *p)
+* 功能 : 改变液晶的某位置值，比如要改第一行，第五列开始显示"ab cd ef" ，调用该函数如下
+     L1602_string(1,5,"ab cd ef;")
+* 输入 : 行，列，需要输入1602的数据
+* 输出 : 无
+*********************************************************************/
+void L1602_string(uchar hang,uchar lie,uchar *p)
+{
+    uchar a;
+    if(hang == 1) a = 0x80;
+    if(hang == 2) a = 0xc0;
+    a = a + lie - 1;
+    enable(a);
+    while(1)
+    {
+        if(*p == '\0') break;
+        write(*p);
+        p++;
+    }
+}
+
+void display()
+{
+    if(DA%10000/1000!=0)
+        L1602_char(1,8,DA%10000/1000+0x30);
+    else
+        L1602_char(1,8,' ');
+    if(DA%10000/100!=0)
+        L1602_char(1,9,DA%1000/100+0x30);
+    else
+        L1602_char(1,9,' ');
+    if(DA%10000/10!=0)
+        L1602_char(1,10,DA%100/10+0x30);
+    else
+        L1602_char(1,10,' ');
+    L1602_char(1,11,DA%10+0x30);
+
+    if(WARNING%10000/1000!=0)
+        L1602_char(2,8,WARNING%10000/1000+0x30);
+    else
+        L1602_char(2,8,' ');
+    if(WARNING%10000/100!=0)
+        L1602_char(2,9,WARNING%1000/100+0x30);
+    else
+        L1602_char(2,9,' ');
+    if(WARNING%10000/10!=0)
+        L1602_char(2,10,WARNING%100/10+0x30);
+    else
+        L1602_char(2,10,' ');
+    L1602_char(2,11,WARNING%10+0x30);
+    BUZZ=1;  //蜂鸣器关
+}
+
+//按键处理
+void Key()
+{
+    if(SET_KEY==0)  //如果按下设置按键则
+    {
+        delay_ms(20);
+        if(SET_KEY==0)
+        {
+            BUZZ=0;  //蜂鸣器开
+            set=!set;  //设置的标志置1
+            TR0=!set;  //关定时器0
+            if(set==1)
+            {
+                enable(0x80+0x40+7);
+                if(WARNING%10000/1000!=0)
+                    write(WARNING%10000/1000+0x30);
+                else
+                    write(' ');
+                if(WARNING%10000/100!=0)
+                    write(WARNING%1000/100+0x30);
+                else
+                    write(' ');
+                if(WARNING%10000/10!=0)
+                    write(WARNING%100/10+0x30);
+                else
+                    write(' ');
+                write(WARNING%10+0x30);
+                enable(0x0f);//开光标显示 无光标 光标闪烁
+                enable(0x80+0x40+10);//位置
+            }
+            else
+            {
+                enable(0x0c);//开光标显示 无光标 光标闪烁
+            }
+            BUZZ=1;  //蜂鸣器关
+            while(SET_KEY==0);//等待按键释放
+        }
+    }
+    if(ADD_KEY==0&&set!=0)    //如果设置的状态下按下键
+    {
+        delay_ms(20);
+        if(ADD_KEY==0&&set!=0)
+        {
+            BUZZ=0;    //蜂鸣器开
+            WARNING+=10;  //报警值加1
+            if(WARNING>=1000)  //如果报警值大于等于255
+                WARNING=1000;    //报警值清零
+            enable(0x80+0x40+7);
+            if(WARNING%10000/1000!=0)
+                write(WARNING%10000/1000+0x30);
+            else
+                write(' ');
+            if(WARNING%10000/100!=0)
+                write(WARNING%1000/100+0x30);
+            else
+                write(' ');
+            if(WARNING%10000/10!=0)
+                write(WARNING%100/10+0x30);
+            else
+                write(' ');
+            write(WARNING%10+0x30);
+            enable(0x80+0x40+10);//光标位置
+            BUZZ=1;  //蜂鸣器关
+//          write_eeprom();           //保存数据
+        }
+        while(ADD_KEY==0);    //等待按键释放
+    }
+    if(SUB_KEY==0&&set!=0)    //如果设置的状态下按下键
+    {
+        delay_ms(20);
+        if(SUB_KEY==0&&set!=0)
+        {
+            BUZZ=0;    //蜂鸣器开
+            WARNING-=10;  //报警值减1
+            if(WARNING<10)  //如果报警值大于等于255
+                WARNING=0;    //报警值清零
+            enable(0x80+0x40+7);
+            if(WARNING%10000/1000!=0)
+                write(WARNING%10000/1000+0x30);
+            else
+                write(' ');
+            if(WARNING%10000/100!=0)
+                write(WARNING%1000/100+0x30);
+            else
+                write(' ');
+            if(WARNING%10000/10!=0)
+                write(WARNING%100/10+0x30);
+            else
+                write(' ');
+            write(WARNING%10+0x30);
+            enable(0x80+0x40+10);//光标位置
+            BUZZ=1;  //蜂鸣器关
+//          write_eeprom();           //保存数据
+        }
+        while(SUB_KEY==0);    //等待按键释放
+    }
+}
+
+void ALARM()
+{
+    if(DA>=WARNING)
+    {
+        flag_BJ=1;
+        LED_RED=0;
+        LED_YELLOW=1;
+        LED_GREEN=1;
+        jdq=0;
+    }
+    else
+    {
+        if(DA<WARNING&&DA>=WARNING/2)
+        {
+            LED_RED=1;
+            LED_YELLOW=0;
+            LED_GREEN=1;
+            jdq=1;
+        }
+        else
+        {
+            LED_RED=1;
+            LED_YELLOW=1;
+            LED_GREEN=0;
+            jdq=1;
+        }
+        flag_BJ=0;
+        BUZZ=1;
+    }
+}
+
+/********************************************************************
+* 名称 : Main()
+* 功能 : 主函数
+*********************************************************************/
+void main()
+{
+    uchar h;
+    uint sum;
+    EA = 0;
+    Timer0_Init();  //定时器0初始化
+    EA = 1;
+    RW=0;
+    L1602_init();
+    while(1)
+    {
+        if (FlagStartRH == 1&&set==0)  //温湿度转换标志置位
+        {
+            TR0 = 0;
+            for(h=0;h<50;h++)
+            {
+                DA=adc0832(0);
+                sum=sum+DA;
+                delay_ms(100);
+                Key();
+            }
+            DA=sum/50;
+            sum=0;
+            DA=DA*(float)(DA/5);
+            ALARM();
+            if(set==0)
+                display();
+            TR0 = 1;
+        }
+        Key();
+        ALARM();
+    }
+}

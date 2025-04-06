@@ -1,0 +1,128 @@
+Requirements document: 51 microcontroller based soil moisture automatic flower watering system
+1. Project Overview
+The aim of this project is to design a 51 microcontroller based soil moisture automatic flower watering system. The system is able to monitor the soil moisture in real time and automatically control the switch of the water pump according to the preset moisture threshold, thus realising the function of automatic flower watering. The system also has the function of manually controlling the water pump, so that the user can manually switch on or off the water pump by pressing a button. In addition, the system also provides the function of setting the upper and lower humidity thresholds, so that the user can adjust the humidity alarm threshold according to the demand of plants.
+
+2. System Functional Requirements
+
+2.1 Soil moisture detection:
+The system detects soil humidity in real time through ADC0832 analogue-to-digital converter chip.
+The humidity value is displayed through a digital tube with a display range of 0-99.
+
+2.2 Automatic watering control:
+The system automatically controls the switch of the water pump according to the detected soil humidity value.
+When the soil humidity is lower than the set lower limit value, the system automatically switches on the water pump for watering.
+When the soil moisture reaches or exceeds the set upper limit value, the system automatically switches off the water pump.
+
+2.3 Manual watering control:
+Users can manually turn on or off the water pump by pressing the key.
+The priority of manual control is higher than automatic control.
+
+2.4 Upper and lower humidity limit setting:
+Users can set the upper and lower limit values of humidity by pressing the key.
+The upper and lower humidity limit values are displayed through digital tubes, so users can view and adjust them intuitively.
+
+2.5 Digital tube display:
+The system displays the current humidity value or the set upper and lower humidity limit values through the 4-digit digital tube.
+The display includes the digit and ten digit of humidity, and the sign of upper and lower limit (H means upper limit, L means lower limit).
+
+2.6 Key function:
+Setting key: used to enter humidity upper and lower limit setting mode and switch setting items.
+Increase key: used to increase the currently set humidity value +1.
+Decrease key: used to decrease the currently set humidity value -1.
+Manual control key: used to manually switch on or off the pump.
+
+3. Hardware Requirements
+
+3.1 Microcontroller:
+Use 51 series microcontroller (such as STC89C52) as the main control chip.
+
+3.2 Microcontroller ports are assigned as follows:
+
+3.2.1 P0 port: used to control the segment selection signal of digital tube.
+
+3.2.2 P1 port:
+P1.0: connect the CS pin (chip select signal) of ADC0832.
+P1.2: Connect the SCL pin (clock signal) of ADC0832.
+P1.3: Connect the DO pin of ADC0832 (data output).
+P1.4-P1.7: Connect the independent keys (Setup key, Increase key, Decrease key, Manual control key).
+
+3.2.3 P2 port:
+P2.0: connect the bit selection signal 1 (smg_we1) of the digital tube.
+P2.2: Connect the bit selection signal 2 (smg_we2) of the digital tube.
+P2.4: Connect the bit selection signal 3 (smg_we3) of the digital tube.
+P2.6: Connect the bit selection signal 4 (smg_we4) of the digital tube.
+
+3.2.4 P3 port:
+P3.5: Connect the water pump control relay (dianji) for controlling the water pump on/off.
+
+3.3 Humidity Sensor:
+Use ADC0832 analogue-to-digital converter chip to connect soil moisture sensor for detecting soil moisture.
+ADC0832 pin connection:
+CS: Connect P1.0.
+SCL: connect P1.2.
+DO: connect P1.3.
+
+3.4 Digital tube display:
+Use 4-bit digital tube to display the current humidity value or the set humidity upper and lower limits.
+
+3.5 Digital tube connection:
+Data signal: connect to port P0.
+
+3.6 Bit selection signal:
+smg_we1: connect to P2.0.
+smg_we2: connect to P2.2.
+smg_we3: connect to P2.4.
+smg_we4: connect to P2.6.
+
+3.7 Keys:
+Use 4 separate keys for setting, increasing, decreasing and manual control of the pump.
+
+3.8 Key connection:
+Setting key: connect P1.4.
+Increase key: connect to P1.5.
+Decrease key: connect P1.6.
+Manual control key: connect P1.7.
+
+3.9 Pump control:
+Control the switch of the relay through the P3.5 port of the microcontroller, which in turn controls the switching on and off of the water pump.
+
+3.10 Relay connection:
+Control terminal: connect P3.5.
+Output: connect to the water pump power supply.
+
+3.11 Power supply:
+The system requires 5V DC power supply for the microcontroller, sensors, digital tubes and relays.
+
+4. Software requirements
+
+4.1 Main program flow:
+After the system is powered up, initialise the IO ports and variables.
+Enter the main loop and detect the key status and soil humidity in real time.
+According to the key status and humidity value, execute the corresponding control logic.
+
+4.2 Humidity Detection:
+Read the analogue signal from the soil humidity sensor through ADC0832 and convert it to a digital signal.
+The read humidity value is linearised and converted to a range of 0-99.
+
+4.3 Automatic watering control logic:
+When the detected humidity value is lower than the set lower limit value, the water pump is switched on.
+When the detected humidity value reaches or exceeds the set upper limit value, switch off the water pump.
+
+4.4 Manual watering control logic:
+When the user presses the manual control key, the pump is directly controlled to turn on or off, ignoring the automatic control logic.
+
+4.5 Humidity upper and lower limit setting logic:
+When the user presses the setup key, it enters the humidity upper and lower limit setting mode.
+Adjust the currently set humidity value by increasing and decreasing keys.
+After setting is complete, press the setup key to exit the setting mode.
+
+4.6 Digital tube display logic:
+In normal mode, the digital pipe displays the current humidity value.
+In setting mode, the digital pipe displays the currently set humidity value and the H or L symbol.
+
+5. System parameters
+Humidity range: Humidity display range is 0-99, 0 means the driest, 99 means the wettest.
+Upper and lower humidity limit default values: the upper humidity limit default value is 70.
+The default value of lower humidity limit is 25.
+Key Dithering Time: The key dithering time is 1ms.
+Display Refresh Frequency: The digital tube display refresh frequency is 200ms.

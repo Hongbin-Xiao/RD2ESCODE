@@ -1,0 +1,108 @@
+Requirement document: 8051 microcontroller based solar auto-tracking system
+1. Project Overview
+This system is designed based on 8051 series microcontroller (e.g. AT89C51), which detects the ambient light intensity through the photoresistor sensor and realises the automatic tracking control of solar panels. The system supports manual and automatic dual-mode operation, and is able to adjust the horizontal and vertical angles of the solar panel according to the direction of the light source to maximise the efficiency of light energy absorption. The core functions include sensor data acquisition, stepper motor drive, abnormal status indication and human-computer interaction control, which is suitable for light source tracking scenarios of solar power generation equipment.
+
+2. Function Requirements
+Function No. Function Description Input/Trigger Condition Output/Response Result
+F1 Manual/Auto mode switching Press the mode switching button (P3.5) to switch the LED indicator (P1.2/P1.3) status.
+F2 Manual Direction Control Press direction button (up, down, left, right) Stepping motor rotates in specified direction
+F3 Automatic light source tracking Photoresistor input in automatic mode Stepper motor automatically adjusts to the direction of the strongest light source
+F4 Sensor Abnormal Detection Photoresistor value exceeds limit (0 or 255) LED blinks to indicate an error.
+F5 Stepper motor drive control Direction flag bit trigger Stepper motor rotates according to the preset phase sequence
+F6 System status display During real-time operation LED indicates current mode (manual/automatic/abnormal)
+3. Non-functional requirements
+Non-functional Requirements
+
+Tracking accuracy: Light intensity difference tolerance range ±15 (configurable), stop fine-tuning when the difference is less than 4 (vertical)/7 (horizontal).
+
+Response speed: stepper motor drive cycle 2.5ms, ensuring smooth and jitter-free rotation.
+
+Sensor sampling rate: ADC data is updated ≥100 times per second.
+
+Abnormal recovery: The system automatically exits the error state after the sensor returns to normal.
+
+Hardware constraints
+
+Main control chip: AT89C51 microcontroller, 12MHz crystal.
+
+Sensor module: 4-channel photoresistor (connected to PCF8591 ADC chip), detection range 0-5V.
+
+Actuator: 2-way four-phase stepping motor, respectively control horizontal and vertical direction.
+
+Human-machine interface: 5 independent buttons (mode switching, up/down/right/left control), 2 LED status indicators.
+
+Reliability requirements
+
+Operating temperature range: -20℃~70℃.
+
+Continuous operation time: ≥24×7 hours.
+
+Anti-interference design: photoresistor input signal to be filtered by RC, key hardware de-jitter.
+
+4. System Design
+4.1 Hardware Design
+Module Configuration
+Main control circuit AT89C51 minimum system (including reset circuit, 12MHz crystal)
+ADC module PCF8591 chip, I2C interface (SDA → P1.0, SCL → P1.1)
+Stepping motor drive Horizontal direction motor connected to P2.0-P2.3, vertical direction connected to P2.4-P2.7
+Sensor input 4-way photoresistor connection PCF8591 channel 0-3 (AD0-AD3)
+Status indication Manual mode LED (P1.2), automatic mode LED (P1.3)
+4.2 Software Design
+Main programme flow
+
+plaintext
+Copy
+Initialisation → Configure timer, ADC → Enter main loop.  
+  1. read photoresistor value (AD0-AD3)  
+  2. detect key input, switch mode or direction  
+  3. Execute auto-tracking logic (difference calculation and direction decision)  
+  4. Update stepper motor control signal  
+  5. Detect sensor abnormality and trigger alarm  
+Key Logic
+
+Auto-tracking algorithm:
+
+Vertical direction: Compare the upper and lower photoresistor values (AD0 vs AD1) and adjust the motor direction when the difference is ≥15.
+
+Horizontal direction: compare left and right photoresistor values (AD2 vs AD3), adjust motor direction when the difference is ≥15.
+
+Stepper motor control:
+
+Use 8-phase drive sequence (e.g. 0x01, 0x03, 0x02...), output cyclically via timer interrupt (2.5ms).
+
+Exception handling:
+
+Dual LEDs flash alarm at 1Hz when the photoresistor value is out of the 0-255 range.
+
+5. Test Verification
+Test item Expected result Passing standard
+Manual mode control The stepper motor rotates in the expected direction after pressing the key. The direction of motor rotation is the same as that defined by the key.
+Auto mode light source tracking The motor automatically adjusts to the alignment position after the light source is shifted Adjustment time ≤ 2 seconds, difference in light intensity <4% after stopping.
+Sensor abnormality detection Photoresistor short circuit/open circuit Dual LED flashes, motor stops running.
+Mode switching response LED status switching after pressing the mode key Manual/automatic mode indication correctly
+Stepping motor drive stability No step loss or overheating after 1 hour of continuous operation.
+6. Dependencies
+Hardware Dependency
+
+PCF8591 ADC module, four-phase stepper motor, photoresistor array, 5V regulated power supply.
+
+Software Dependencies
+
+Keil C51 development environment, supporting 8051 instruction set and timer interrupt configuration.
+
+
+Appendix
+Photoresistor Layout
+
+Sensor Function PCF8591 Channel
+AD0 Lower light intensity detection Channel 0
+AD1 Upper light intensity detection Channel 1
+AD2 Right light intensity detection Channel 2
+AD3 Left light intensity detection Channel 3
+Stepper motor phase table
+
+Direction Control code sequence (hexadecimal)
+Vertical forward 0x01, 0x03, 0x02, 0x06, 0x04, 0x0C, 0x08, 0x09
+Vertical reverse 0x09, 0x08, 0x0C, 0x04, 0x06, 0x02, 0x03, 0x01
+Horizontal forward 0x10, 0x30, 0x20, 0x60, 0x40, 0xC0, 0x80, 0x90
+Horizontal Reverse 0x90, 0x80, 0xC0, 0x40, 0x60, 0x20, 0x30, 0x10

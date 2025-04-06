@@ -1,0 +1,255 @@
+/**
+ * 温度控制系统 - 结构化编程实现
+ * 基于8051单片机和DS18B20温度传感器
+ */
+
+#include <reg51.h>
+#include <intrins.h>
+
+/* 类型定义 */
+#define uchar unsigned char
+#define uint unsigned int
+
+/* 硬件接口定义 */
+sbit DQ = P1^0;    // DS18B20数据线
+sbit FAN1 = P1^1;  // 风扇1控制端口
+sbit FAN2 = P1^2;  // 风扇2控制端口
+sbit FAN3 = P1^3;  // 风扇3控制端口
+sbit FAN4 = P1^4;  // 风扇4控制端口
+
+/* 常量定义 */
+// 数码管显示段码表(共阳极)
+uchar code SEGMENT_TABLE[] = {
+    0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0x80, 0x90
+};
+
+/* 全局变量 */
+uchar g_tempDigit1;  // 温度十位
+uchar g_tempDigit2;  // 温度个位
+uint g_temperature = 0;  // 当前温度值
+
+/**
+ * 延时函数
+ * @param i 延时计数值
+ */
+void delay(unsigned int i)
+{
+    while(i--);
+}
+
+/**
+ * 初始化DS18B20传感器
+ * @return 0-成功, 1-失败
+ */
+uchar initDS18B20(void)
+{
+    uchar status = 0;
+    
+    DQ = 1;            // DQ复位
+    delay(8);          // 短暂延时
+    DQ = 0;            // 发送复位脉冲
+    delay(80);         // 延时480us以上
+    DQ = 1;            // 释放总线
+    delay(10);         // 等待15-60us
+    status = DQ;       // 读取存在脉冲
+    delay(5);          // 延时60-240us
+    
+    return status;     // 返回状态，0表示成功
+}
+
+/**
+ * 从DS18B20读取一个字节
+ * @return 读取的字节数据
+ */
+uchar readByte(void)
+{
+    uchar i = 0;
+    uchar dat = 0;
+    
+    for (i = 8; i > 0; i--)
+    {
+        DQ = 0;        // 产生读时隙
+        dat >>= 1;     // 数据右移一位
+        DQ = 1;        // 释放总线
+        if(DQ)         // 读取数据位
+            dat |= 0x80;
+        delay(5);      // 延时等待
+    }
+    
+    return dat;
+}
+
+/**
+ * 向DS18B20写入一个字节
+ * @param dat 要写入的字节数据
+ */
+void writeByte(uchar dat)
+{
+    uchar i = 0;
+    
+    for (i = 8; i > 0; i--)
+    {
+        DQ = 0;        // 产生写时隙
+        DQ = dat & 0x01;  // 写入数据位
+        delay(5);      // 延时等待
+        DQ = 1;        // 释放总线
+        dat >>= 1;     // 数据右移一位
+    }
+    
+    delay(5);
+}
+
+/**
+ * 读取DS18B20温度值
+ * @return 温度原始值
+ */
+uint readTemperature(void)
+{
+    uchar tempL = 0;
+    uchar tempH = 0;
+    uint temp = 0;
+    
+    if(initDS18B20() == 1)  // 初始化失败
+        return 0xFFFF;      // 返回错误码
+    
+    writeByte(0xCC);        // 跳过ROM命令
+    writeByte(0x44);        // 开始温度转换
+    delay(1000);            // 等待转换完成
+    
+    if(initDS18B20() == 1)  // 再次初始化
+        return 0xFFFF;
+    
+    writeByte(0xCC);        // 跳过ROM命令
+    writeByte(0xBE);        // 读取暂存器命令
+    
+    tempL = readByte();     // 读取温度低字节
+    tempH = readByte();     // 读取温度高字节
+    
+    temp = tempH;
+    temp <<= 8;
+    temp |= tempL;
+    
+    return temp;
+}
+
+/**
+ * 处理温度数据并更新显示
+ */
+void processTemperature(void)
+{
+    uint rawTemp;
+    uint temp;
+    
+    rawTemp = readTemperature();
+    
+    if(rawTemp == 0xFFFF)  // 读取失败
+    {
+        g_tempDigit1 = 10;  // 显示错误码
+        g_tempDigit2 = 10;
+        g_temperature = 99;  // 设置为最高温度，触发安全模式
+        return;
+    }
+    
+    temp = rawTemp >> 4;    // 获取整数部分
+    
+    g_tempDigit1 = temp / 10;    // 十位
+    g_tempDigit2 = temp % 10;    // 个位
+    g_temperature = temp;
+}
+
+/**
+ * 更新数码管显示
+ */
+void updateDisplay(void)
+{
+    P2 = SEGMENT_TABLE[g_tempDigit1];  // 显示十位
+    P3 = SEGMENT_TABLE[g_tempDigit2];  // 显示个位
+}
+
+/**
+ * 根据温度控制风扇
+ */
+void controlFans(void)
+{
+    if(g_temperature < 20)
+    {
+        FAN1 = 1;  // 关闭
+        FAN2 = 1;  // 关闭
+        FAN3 = 0;  // 开启
+        FAN4 = 1;  // 关闭
+    }
+    else if(g_temperature >= 20 && g_temperature < 30)
+    {
+        // 20-30°C区间，根据需求文档补充
+        FAN1 = 1;  // 关闭
+        FAN2 = 1;  // 关闭
+        FAN3 = 0;  // 开启
+        FAN4 = 1;  // 关闭
+    }
+    else if(g_temperature >= 30 && g_temperature < 40)
+    {
+        FAN1 = 1;  // 关闭
+        FAN2 = 0;  // 开启
+        FAN3 = 0;  // 开启
+        FAN4 = 1;  // 关闭
+    }
+    else if(g_temperature >= 40 && g_temperature < 50)
+    {
+        // 40-50°C区间，根据需求文档补充
+        FAN1 = 1;  // 关闭
+        FAN2 = 0;  // 开启
+        FAN3 = 0;  // 开启
+        FAN4 = 1;  // 关闭
+    }
+    else if(g_temperature >= 50 && g_temperature < 60)
+    {
+        FAN1 = 0;  // 开启
+        FAN2 = 0;  // 开启
+        FAN3 = 0;  // 开启
+        FAN4 = 1;  // 关闭
+    }
+    else  // 温度 >= 60°C
+    {
+        FAN1 = 0;  // 开启
+        FAN2 = 0;  // 开启
+        FAN3 = 0;  // 开启
+        FAN4 = 0;  // 开启
+    }
+}
+
+/**
+ * 系统初始化
+ */
+void systemInit(void)
+{
+    // 初始化端口
+    P1 = 0xFF;  // 设置P1为高电平
+    P2 = 0xFF;  // 设置P2为高电平
+    P3 = 0xFF;  // 设置P3为高电平
+    
+    // 初始化变量
+    g_tempDigit1 = 0;
+    g_tempDigit2 = 0;
+    g_temperature = 0;
+}
+
+/**
+ * 主函数
+ */
+void main(void)
+{
+    systemInit();
+    
+    // 系统自检，读取多次温度确保稳定
+    processTemperature(); delay(20000);
+    processTemperature(); delay(20000);
+    processTemperature(); delay(20000);
+    
+    while(1)
+    {
+        processTemperature();  // 读取并处理温度
+        updateDisplay();       // 更新显示
+        controlFans();         // 控制风扇
+        delay(20000);          // 延时等待
+    }
+}

@@ -1,0 +1,100 @@
+1. Project overview
+This system is designed based on 8051 series microcontroller (e.g. AT89C51). It collects real-time ambient temperature through DS18B20 digital temperature sensor and displays the current temperature value (unit: ℃) on two common anode digital tube. The system controls the start and stop status of 4 fans (f1-f4) according to the preset temperature threshold to achieve multi-level temperature control cooling, which is suitable for machine rooms, industrial equipment and other scenarios that require dynamic cooling management.
+
+2. Function Requirements
+Function No. Function Description Input/Trigger Condition Output/Response Result
+F1 Temperature real-time acquisition and display DS18B20 sensor input Digital tube displays the current temperature (ten digits, single digit)
+F2 Multi-stage fan control Temperature value exceeds preset threshold Fan starts and stops according to rules (see Table 1)
+F3 Temperature data calibration Sensor initialisation and data reading Temperature value error ≤±0.5°C
+F4 System self-test Power-on automatic operation Sensor communication verification, display module initialisation
+Table 1: Temperature threshold and fan control logic
+
+Temperature range Fan status (f1-f4) Control description
+T < 20°C f1=1, f2=1, f3=0, f4=1 Fan 3 on only (low load cooling)
+30°C ≤ T < 40°C f1=1, f2=0, f3=0, f4=1 Switch off fan 2, keep fan 3 running
+50℃ ≤ T < 60℃ f1=0, f2=0, f3=0, f4=1 switch off fan 1 and 2, only fan 3 full speed operation
+T ≥ 60°C f1=0, f2=0, f3=0, f4=0 All fans on full speed (emergency cooling mode)
+Notes:
+
+Fan control logic: 0 means fan on, 1 means fan off (according to the code of low level effective design).
+
+Temperature range design: Increase the heat dissipation intensity step by step to avoid frequent start and stop.
+
+3. Non-functional requirements
+Performance Indicator
+
+Temperature measurement range: -55℃~+125℃ (DS18B20 characteristics).
+
+Measurement accuracy: ±0.5℃ (sensor inherent error).
+
+Control response delay: temperature change to fan state switching ≤300ms.
+
+Display refresh rate: ≥1Hz (update once per second).
+
+Hardware constraints
+
+Main control chip: AT89C51 microcontroller, 12MHz crystal.
+
+Sensor module: DS18B20 single-bus temperature sensor, connected to P1.0, external 4.7kΩ pull-up resistor required.
+
+Display module: two-bit common anode digital tube, segment code driver connected to P2 (ten bits), P3 (individual bits).
+
+Actuator: 4-way fan (f1-f4), active low (0=on, 1=off), drive interface P1.1-P1.4.
+
+Reliability requirements
+
+Continuous operation time: ≥24×7 hours.
+
+Anti-interference ability: sensor signal lines need to be shielded to avoid electromagnetic interference.
+
+Failure protection: When sensor communication fails, the fan is fully open by default (safe mode).
+
+4. System Design
+4.1 Hardware Design
+Module Configuration
+Main control circuit AT89C51 minimum system (including reset circuit, 12MHz crystal)
+Sensor module DS18B20 single bus connection to P1.0, support parasitic power supply mode
+Display module Two digital tubes, segment code driver through the P2 (tens), P3 (bits) output
+Fan drive 4-way fan through the PNP transistor drive, interface P1.1-P1.4
+4.2 Software Design
+Main programme flow
+
+plaintext
+Copy
+Initialisation → sensor self-test → enter main loop.  
+  1. read temperature data  
+  2. update the digital display  
+  3. control the fan status according to the temperature thresholds  
+  4. 200ms delay time → repeat cycle  
+Key Logic
+
+Temperature Acquisition: Communicate with DS18B20 via single bus protocol (1-Wire) to read 12-bit temperature data.
+
+Data processing: Convert raw data to decimal temperature value (e.g. 0x0190 → 25.0°C).
+
+Fan control: according to the logic of Table 1, adjust the fan start-stop state step by step to ensure the balance of cooling efficiency and energy consumption.
+
+5. Test Verification
+Test Item Expected Result Passing Criteria
+Low temperature test (15℃) Digital tube shows 15, only fan 3 is on Fan 3 status is 0, the rest is 1.
+Medium temperature test (35℃) The digital tube displays 35, fan 2 and 3 remain on, fan 2 and 3 status is 0, fan 1 and 4 are 1.
+High temperature test (55℃) Digital tube shows 55, fan 1, 2 and 3 run at full speed Fan 1, 2, 3 is 0, 4 is 1
+Ultra-high temperature test (65℃) Digital tube displays 65, all fans are running at full speed, and the status of fans 1-4 are all 0.
+Abnormal communication test Digital tube displays ‘---’, all fans on System enters safe mode
+6. Dependencies
+Hardware Dependencies
+
+
+
+8. Appendix
+Pin Assignment Table
+
+Function Microcontroller Pin Peripheral Pin
+DS18B20 DQ P1.0 Sensor data line
+Digit ten P2.0-P2.7 Digit segment code a-g
+P3.0-P3.7 Digital segment code a-g
+Fan control P1.1-P1.4 Fan 1-4 drive signal
+Temperature conversion formula
+
+Copy
+Actual temperature value = Raw data × 0.0625 (12-bit resolution)  
