@@ -31,7 +31,8 @@ The RD2ESCODE framework consists of four main stages:
 
 ![FIG 1 - 副本_00](https://github.com/user-attachments/assets/8dd262fc-b707-4264-8e5d-01ba9e3fa2f9)
 
-![fig3_00(1)](https://github.com/user-attachments/assets/397e7d66-3648-4aaf-bece-df2e7725b31e)
+![fig3_00(2)](https://github.com/user-attachments/assets/c46f3acf-6832-4aa2-aada-dd8268118a7c)
+
 
 ![Python](https://img.shields.io/badge/python-3.7+-orange)
 
