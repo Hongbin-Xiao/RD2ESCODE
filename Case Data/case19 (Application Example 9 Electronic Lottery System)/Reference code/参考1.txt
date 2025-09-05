@@ -1,0 +1,279 @@
+#include <AT89X52.h>
+#include <intrins.h>
+#include <stdlib.h>
+
+// 常量定义
+#define TRUE  1
+#define FALSE 0
+
+// 全局变量
+bit bT0Flg = FALSE;
+
+// 74HC595芯片引脚定义
+// U2 595芯片控制引脚定义
+sbit sbSHCP2 = P2^0;
+sbit sbDS2 = P2^1;
+sbit sbSTCP2 = P2^2;
+// U3 595芯片控制引脚定义
+sbit sbSHCP3 = P2^3;
+sbit sbDS3 = P2^4;
+sbit sbSTCP3 = P2^5;
+// U4 595芯片控制引脚定义
+sbit sbSHCP4 = P2^6;
+sbit sbDS4 = P2^7;
+sbit sbSTCP4 = P3^0;
+// U5 595芯片控制引脚定义
+sbit sbSHCP5 = P3^1;
+sbit sbDS5 = P3^3;
+sbit sbSTCP5 = P3^4;
+// U6 595芯片控制引脚定义
+sbit sbSHCP6 = P3^5;
+sbit sbDS6 = P3^6;
+sbit sbSTCP6 = P3^7;
+
+// 数据变量
+unsigned char temp2, temp3, temp4, temp5, temp6;
+bdata unsigned char sw;    // 位变量
+
+sbit sw0 = sw ^ 0;
+sbit sw1 = sw ^ 1;
+sbit sw2 = sw ^ 2;
+sbit sw3 = sw ^ 3;
+sbit sw4 = sw ^ 4;
+sbit sw5 = sw ^ 5;
+sbit sw6 = sw ^ 6;
+sbit sw7 = sw ^ 7;
+
+// 数码管段码表
+unsigned char code SEGtable[] =
+{
+    0xc0, 0xf9, 0xa4, 0xb0, 0x99, 0x92, 0x82, 0xf8, 0x80, 0x90,
+};
+
+// 595输入函数2号
+void Input5952()
+{
+    unsigned char i;
+    for(i=0; i<8; i++)
+    {
+        temp2 <<= 1;
+        sbDS2 = CY;
+        sbSHCP2 = 1;
+        _nop_();
+        _nop_();
+        sbSHCP2 = 0;
+    }
+}
+
+// 595输出函数2号
+void Output5952()
+{
+    sbSTCP2 = 0;
+    _nop_();
+    sbSTCP2 = 1;
+    _nop_();
+    sbSTCP2 = 0;
+}
+
+// 595输入函数3号
+void Input5953()
+{
+    unsigned char i;
+    for(i=0; i<8; i++)
+    {
+        temp3 <<= 1;
+        sbDS3 = CY;
+        sbSHCP3 = 1;
+        _nop_();
+        _nop_();
+        sbSHCP3 = 0;
+    }
+}
+
+// 595输出函数3号
+void Output5953()
+{
+    sbSTCP3 = 0;
+    _nop_();
+    sbSTCP3 = 1;
+    _nop_();
+    sbSTCP3 = 0;
+}
+
+// 595输入函数4号
+void Input5954()
+{
+    unsigned char i;
+    for(i=0; i<8; i++)
+    {
+        temp4 <<= 1;
+        sbDS4 = CY;
+        sbSHCP4 = 1;
+        _nop_();
+        _nop_();
+        sbSHCP4 = 0;
+    }
+}
+
+// 595输出函数4号
+void Output5954()
+{
+    sbSTCP4 = 0;
+    _nop_();
+    sbSTCP4 = 1;
+    _nop_();
+    sbSTCP4 = 0;
+}
+
+// 595输入函数5号
+void Input5955()
+{
+    unsigned char i;
+    for(i=0; i<8; i++)
+    {
+        temp5 <<= 1;
+        sbDS5 = CY;
+        sbSHCP5 = 1;
+        _nop_();
+        _nop_();
+        sbSHCP5 = 0;
+    }
+}
+
+// 595输出函数5号
+void Output5955()
+{
+    sbSTCP5 = 0;
+    _nop_();
+    sbSTCP5 = 1;
+    _nop_();
+    sbSTCP5 = 0;
+}
+
+// 595输入函数6号
+void Input5956()
+{
+    unsigned char i;
+    for(i=0; i<8; i++)
+    {
+        temp6 <<= 1;
+        sbDS6 = CY;
+        sbSHCP6 = 1;
+        _nop_();
+        _nop_();
+        sbSHCP6 = 0;
+    }
+}
+
+// 595输出函数6号
+void Output5956()
+{
+    sbSTCP6 = 0;
+    _nop_();
+    sbSTCP6 = 1;
+    _nop_();
+    sbSTCP6 = 0;
+}
+
+// 随机数种子初始化函数
+void initrand(void)
+{
+    unsigned char counter = 0;
+    P1 = 0xff;
+    sw = P1;
+    counter = 0;  // 统计开关闭合的数量
+    
+    // 检查每个开关状态并计数
+    if(sw0 == 1) counter++;
+    if(sw1 == 1) counter++;
+    if(sw2 == 1) counter++;
+    if(sw3 == 1) counter++;
+    if(sw4 == 1) counter++;
+    if(sw5 == 1) counter++;
+    if(sw6 == 1) counter++;
+    if(sw7 == 1) counter++;
+    
+    srand(counter);  // 初始化随机数
+}
+
+// 定时器0初始化函数
+void Timer0Init(void)
+{
+    TMOD = 0x01;                  // 设置T0工作模式1
+    TH0 = (65536 - 100000) / 256; // 100ms定时，高8位
+    TL0 = (65536 - 100000) % 256; // 100ms定时，低8位
+    ET0 = 1;                      // 使能定时器0中断
+    // TR0 = 1;                   // 启动定时器
+}
+
+// 定时器0中断处理函数
+void Timer0Deal(void) interrupt 1 using 1
+{
+    ET0 = 0;                      // 先关闭中断
+    TH0 = (65536 - 100000) / 256; // 重新装载预置值
+    TL0 = (65536 - 100000) % 256;
+    ET0 = 1;                      // 开启T0中断
+    bT0Flg = TRUE;                // 设置定时器中断标志位
+}
+
+// 外部中断0处理函数
+void EX_INT0() interrupt 0 using 1
+{
+    if(TR0 == 1)                  // 判断当前定时器工作状态
+    {
+        TR0 = 0;                  // 关闭定时器
+    }
+    else
+    {
+        TR0 = 1;                  // 启动定时器
+        initrand();               // 初始化随机数
+    }
+}
+
+// 主函数
+void main()
+{
+    unsigned int randdata = 0;
+    unsigned char wdata, qdata, baidata, sdata, gdata;
+    
+    // 初始化
+    Timer0Init();                 // 初始化定时器
+    IT0 = 1;                      // 设置外部中断0触发方式为下降沿
+    EX0 = 1;                      // 使能外部中断0
+    EA = 1;                       // 开启总中断标志
+    
+    // 主循环
+    while(1)
+    {
+        while(bT0Flg == FALSE);   // 等待定时标志位
+        bT0Flg = FALSE;
+        
+        randdata = rand() % 65536;  // 生成0-65535范围的随机数
+        
+        // 分解各位数字并显示
+        wdata = randdata / 10000;    // 分解万位
+        temp2 = SEGtable[wdata];
+        Input5952();
+        Output5952();
+        
+        qdata = randdata % 10000 / 1000;  // 分解千位
+        temp3 = SEGtable[qdata];
+        Input5953();
+        Output5953();
+        
+        baidata = randdata % 1000 / 100;  // 分解百位
+        temp4 = SEGtable[baidata];
+        Input5954();
+        Output5954();
+        
+        sdata = randdata % 100 / 10;    // 分解十位
+        temp5 = SEGtable[sdata];
+        Input5955();
+        Output5955();
+        
+        gdata = randdata % 10;    // 分解个位
+        temp6 = SEGtable[gdata];
+        Input5956();
+        Output5956();
+    }
+}

@@ -1,0 +1,318 @@
+#include <reg52.h>
+#include <intrins.h>
+
+// 引脚定义
+sbit SCK = P2^4;        // SHT11时钟信号
+sbit DATA = P2^5;       // SHT11数据线
+sbit LCD_RS = P2^0;     // LCD寄存器选择信号
+sbit LCD_EN = P2^2;     // LCD使能信号
+
+// 全局变量定义
+unsigned char RH_H, RH_L;           // 湿度高位和低位数据
+unsigned int ii;                    // 补偿后的湿度值
+unsigned char display_buffer[16];   // 显示缓冲区
+
+// 函数声明
+void DelayMs(unsigned int ms);
+void DelayUs(unsigned int us);
+void LCD_Init(void);
+void LCD_WriteCommand(unsigned char cmd);
+void LCD_WriteData(unsigned char dat);
+void LCD_SetCursor(unsigned char row, unsigned char col);
+void LCD_DisplayString(unsigned char row, unsigned char col, unsigned char *str);
+void STARTSHT11(void);
+void GETRH(unsigned char cmd);
+unsigned char ReadByte(void);
+void WriteByte(unsigned char value);
+void COMPENSATIONSHT(void);
+void DisplayHumidity(void);
+void FormatHumidity(unsigned int value, unsigned char *buffer);
+
+/**
+ * 延时函数 - 毫秒级
+ */
+void DelayMs(unsigned int ms)
+{
+    unsigned int i, j;
+    for(i = 0; i < ms; i++)
+        for(j = 0; j < 110; j++);
+}
+
+/**
+ * 延时函数 - 微秒级
+ */
+void DelayUs(unsigned int us)
+{
+    while(us--);
+}
+
+/**
+ * LCD初始化函数
+ */
+void LCD_Init(void)
+{
+    DelayMs(15);                    // 等待LCD上电稳定
+    LCD_WriteCommand(0x38);         // 8位数据模式，2行显示，5x7字符
+    DelayMs(5);
+    LCD_WriteCommand(0x38);
+    DelayMs(5);
+    LCD_WriteCommand(0x38);
+    DelayMs(5);
+    LCD_WriteCommand(0x0C);         // 显示开，光标关，闪烁关
+    DelayMs(5);
+    LCD_WriteCommand(0x01);         // 清屏
+    DelayMs(5);
+    LCD_WriteCommand(0x06);         // 光标右移，显示不移动
+    DelayMs(5);
+}
+
+/**
+ * LCD写命令函数
+ */
+void LCD_WriteCommand(unsigned char cmd)
+{
+    LCD_RS = 0;                     // 选择命令寄存器
+    P0 = cmd;                       // 发送命令
+    LCD_EN = 1;                     // 使能信号
+    DelayUs(1);
+    LCD_EN = 0;                     // 关闭使能
+    DelayUs(100);
+}
+
+/**
+ * LCD写数据函数
+ */
+void LCD_WriteData(unsigned char dat)
+{
+    LCD_RS = 1;                     // 选择数据寄存器
+    P0 = dat;                       // 发送数据
+    LCD_EN = 1;                     // 使能信号
+    DelayUs(1);
+    LCD_EN = 0;                     // 关闭使能
+    DelayUs(100);
+}
+
+/**
+ * LCD设置光标位置
+ */
+void LCD_SetCursor(unsigned char row, unsigned char col)
+{
+    unsigned char address;
+    if(row == 0)
+        address = 0x80 + col;       // 第一行地址
+    else
+        address = 0xC0 + col;       // 第二行地址
+    LCD_WriteCommand(address);
+}
+
+/**
+ * LCD显示字符串
+ */
+void LCD_DisplayString(unsigned char row, unsigned char col, unsigned char *str)
+{
+    LCD_SetCursor(row, col);
+    while(*str)
+    {
+        LCD_WriteData(*str++);
+    }
+}
+
+/**
+ * SHT11启动信号函数
+ */
+void STARTSHT11(void)
+{
+    DATA = 1;                       // 数据线置高
+    SCK = 0;                        // 时钟线置低
+    DelayUs(2);
+    SCK = 1;                        // 时钟线置高
+    DelayUs(2);
+    DATA = 0;                       // 数据线置低（启动信号）
+    DelayUs(2);
+    SCK = 0;                        // 时钟线置低
+    DelayUs(2);
+    SCK = 1;                        // 时钟线置高
+    DelayUs(2);
+    DATA = 1;                       // 数据线置高
+    DelayUs(2);
+    SCK = 0;                        // 时钟线置低
+    DelayUs(2);
+}
+
+/**
+ * 向SHT11写入一个字节
+ */
+void WriteByte(unsigned char value)
+{
+    unsigned char i;
+    for(i = 0; i < 8; i++)
+    {
+        DATA = (value & 0x80) ? 1 : 0;  // 发送最高位
+        DelayUs(2);
+        SCK = 1;                        // 时钟上升沿
+        DelayUs(2);
+        SCK = 0;                        // 时钟下降沿
+        DelayUs(2);
+        value <<= 1;                    // 左移一位
+    }
+    
+    // 等待ACK信号
+    DATA = 1;                           // 释放数据线
+    DelayUs(2);
+    SCK = 1;                            // 时钟上升沿
+    DelayUs(2);
+    SCK = 0;                            // 时钟下降沿
+    DelayUs(2);
+}
+
+/**
+ * 从SHT11读取一个字节
+ */
+unsigned char ReadByte(void)
+{
+    unsigned char i, value = 0;
+    
+    DATA = 1;                           // 释放数据线
+    for(i = 0; i < 8; i++)
+    {
+        value <<= 1;                    // 左移一位
+        SCK = 1;                        // 时钟上升沿
+        DelayUs(2);
+        if(DATA) value |= 0x01;         // 读取数据位
+        SCK = 0;                        // 时钟下降沿
+        DelayUs(2);
+    }
+    
+    // 发送ACK信号
+    DATA = 0;                           // 拉低数据线（ACK）
+    DelayUs(2);
+    SCK = 1;                            // 时钟上升沿
+    DelayUs(2);
+    SCK = 0;                            // 时钟下降沿
+    DelayUs(2);
+    DATA = 1;                           // 释放数据线
+    
+    return value;
+}
+
+/**
+ * 获取湿度数据函数
+ */
+void GETRH(unsigned char cmd)
+{
+    unsigned int timeout = 0;
+    
+    STARTSHT11();                       // 发送启动信号
+    WriteByte(cmd);                     // 发送测量命令（0x05）
+    
+    // 等待测量完成
+    DATA = 1;                           // 释放数据线
+    while(DATA && timeout < 1000)      // 等待DATA线拉低
+    {
+        DelayMs(1);
+        timeout++;
+    }
+    
+    if(timeout < 1000)                  // 测量成功
+    {
+        RH_H = ReadByte();              // 读取湿度高位
+        RH_L = ReadByte();              // 读取湿度低位
+        
+        // 输出调试信息到端口（可选）
+        P1 = RH_H;                      // 湿度高位输出到P1
+        P3 = RH_L;                      // 湿度低位输出到P3
+    }
+}
+
+/**
+ * SHT11数据补偿函数
+ */
+void COMPENSATIONSHT(void)
+{
+    unsigned long temp;
+    
+    // 线性补偿公式
+    temp = (unsigned long)RH_H * 256 + RH_L;   // 合并高低位
+    
+    if(temp > 221)                              // 防止负数
+    {
+        temp = temp - 221;                      // 减去偏移量
+        temp = (temp * 318878L) / 100000L;      // 线性补偿
+        
+        // 根据阈值进行分段补偿
+        if(temp > 5000)
+        {
+            ii = temp + (temp - 5000) / 10;     // 大于50%时的补偿
+        }
+        else
+        {
+            ii = temp;                          // 小于50%时直接使用
+        }
+        
+        // 限制在合理范围内
+        if(ii > 10000) ii = 10000;             // 最大100.00%
+    }
+    else
+    {
+        ii = 0;                                 // 小于最小值时设为0
+    }
+}
+
+/**
+ * 格式化湿度值为字符串
+ */
+void FormatHumidity(unsigned int value, unsigned char *buffer)
+{
+    unsigned char i = 0;
+    unsigned int temp = value;
+    
+    // 转换为XX.XX%RH格式
+    buffer[i++] = (temp / 1000) + '0';          // 十位
+    temp %= 1000;
+    buffer[i++] = (temp / 100) + '0';           // 个位
+    buffer[i++] = '.';                          // 小数点
+    temp %= 100;
+    buffer[i++] = (temp / 10) + '0';            // 小数第一位
+    buffer[i++] = (temp % 10) + '0';            // 小数第二位
+    buffer[i++] = '%';                          // 百分号
+    buffer[i++] = 'R';                          // R
+    buffer[i++] = 'H';                          // H
+    buffer[i] = '\0';                           // 字符串结束符
+}
+
+/**
+ * 显示湿度值函数
+ */
+void DisplayHumidity(void)
+{
+    FormatHumidity(ii, display_buffer);
+    LCD_DisplayString(1, 4, display_buffer);   // 在第二行第5列开始显示
+}
+
+/**
+ * 主函数
+ */
+void main(void)
+{
+    // 系统初始化
+    LCD_Init();                                 // 初始化LCD
+    
+    // 显示固定文本
+    LCD_DisplayString(0, 4, "Humidity");       // 第一行显示"Humidity"
+    LCD_DisplayString(1, 12, "%RH");           // 第二行显示"%RH"固定文本
+    
+    DelayMs(1000);                              // 等待系统稳定
+    
+    // 主循环
+    while(1)
+    {
+        GETRH(0x05);                            // 获取湿度数据（命令0x05）
+        COMPENSATIONSHT();                      // 数据补偿处理
+        DisplayHumidity();                      // 显示湿度值
+        
+        DelayMs(2000);                          // 2秒更新一次
+        
+        // 可选：通过串口输出调试信息
+        // putchar(0x02);  // 需要配置串口功能
+    }
+}

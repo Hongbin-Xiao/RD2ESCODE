@@ -1,0 +1,85 @@
+#include <AT89X52.h>
+
+#define MAX 0x50
+#define MIN 0x00
+#define TIMELINE 11
+#define TRUE  1
+#define FALSE 0
+
+unsigned int TimeCounter;
+bit ArrowFlg = 0;
+unsigned char upCounter, downCounter;
+sbit LED = P2^0;
+
+void T0Deal() interrupt 1 using 0
+{
+    TH0 = 0xf1;
+    TL0 = 0xf1;
+    TR0 = 1;
+    TimeCounter++;
+    
+    if (TimeCounter == TIMELINE)
+    {
+        if ((upCounter == MAX) && (downCounter == MIN))
+        {
+            ArrowFlg = FALSE;
+        }
+        
+        if ((upCounter == MIN) && (downCounter == MAX))
+        {
+            ArrowFlg = TRUE;
+        }
+        
+        if (ArrowFlg == 1)
+        {
+            upCounter++;
+            downCounter--;
+        }
+        else
+        {
+            upCounter--;
+            downCounter++;
+        }
+        
+        TimeCounter = 0;
+    }
+}
+
+void Delay(unsigned int i)
+{
+    unsigned int j;
+    while (i--)
+    {
+        for (j = 0; j < 32; j++);
+    }
+}
+
+void SystemInit(void)
+{
+    upCounter = MIN;
+    downCounter = MAX;
+    TMOD = 0x01;
+    TH0 = 0xF0;
+    TL0 = 0xF0;
+    EA = 1;
+    ET0 = 1;
+    TR0 = 1;
+}
+
+void PWMControl(void)
+{
+    LED = 0;
+    Delay(downCounter);
+    LED = 1;
+    Delay(upCounter);
+}
+
+void main()
+{
+    SystemInit();
+    
+    while (1)
+    {
+        PWMControl();
+    }
+}
